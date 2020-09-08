@@ -1,0 +1,6 @@
+et-xmlfile==1.0.1
+jdcal==1.4.1
+numpy==1.18.5
+opencv-python==3.4.9.33
+openpyxl==2.6.4
+XlsxWriter==1.2.9
