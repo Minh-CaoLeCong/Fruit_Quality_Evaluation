@@ -40,11 +40,23 @@ def fruits_feature_extraction(fileName):
     # load image
     Original_Image = cv2.imread(InputFolder_Path_str + fileName)
 
-    # convert to grayscale
-    GrayScale_Image = cv2.cvtColor(Original_Image, cv2.COLOR_BGR2GRAY)
-    if SaveImageProcessingResult_Check_bool:
-        # save image
-        cv2.imwrite(OutputFolder_GrayImage_Path_str + fileName, GrayScale_Image)
+    if ImageProcessing_Method_str == "hsv":
+        # convert BGR to HSV
+        HSV_Image = cv2.cvtColor(Original_Image, cv2.COLOR_BGR2HSV)
+        if SaveImageProcessingResult_Check_bool:
+            # save image
+            cv2.imwrite(OutputFolder_HsvImage_Path_str + fileName, HSV_Image)
+        # convert to grayscale
+        GrayScale_Image = cv2.cvtColor(HSV_Image, cv2.COLOR_BGR2GRAY)
+        if SaveImageProcessingResult_Check_bool:
+            # save image
+            cv2.imwrite(OutputFolder_GrayImage_Path_str + fileName, GrayScale_Image)
+    else:
+        # convert to grayscale
+        GrayScale_Image = cv2.cvtColor(Original_Image, cv2.COLOR_BGR2GRAY)
+        if SaveImageProcessingResult_Check_bool:
+            # save image
+            cv2.imwrite(OutputFolder_GrayImage_Path_str + fileName, GrayScale_Image)
 
     M = GrayScale_Image.shape[0] # Height of image
     N = GrayScale_Image.shape[1] # Width of image
@@ -324,6 +336,10 @@ if SaveImageProcessingResult_Check_bool == True:
         OutputFolder_InrangeImage_Path_str = OutputFolder_Path_str + "inrange/"
         if not os.path.exists(OutputFolder_InrangeImage_Path_str):
             os.makedirs(OutputFolder_InrangeImage_Path_str)
+    elif ImageProcessing_Method_str == "hsv":
+        OutputFolder_HsvImage_Path_str = OutputFolder_Path_str + "hsv/"
+        if not os.path.exists(OutputFolder_HsvImage_Path_str):
+            os.makedirs(OutputFolder_HsvImage_Path_str)
     OutputFolder_CannyImage_Path_str = OutputFolder_Path_str + "canny/"
     if not os.path.exists(OutputFolder_CannyImage_Path_str):
         os.makedirs(OutputFolder_CannyImage_Path_str)
