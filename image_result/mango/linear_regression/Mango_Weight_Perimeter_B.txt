@@ -1,0 +1,4 @@
+[INFOR]: Coefficient: [0.59146525]
+[INFOR]: Intercept: -762.9772459387834
+[INFOR]: Training set score: 0.7222828029603823
+[INFOR]: Test set score: 0.777771804856261
