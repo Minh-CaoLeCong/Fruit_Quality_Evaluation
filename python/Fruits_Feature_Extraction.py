@@ -9,6 +9,7 @@ from timeit import default_timer as timer
 import time
 # path
 import os
+import concurrent.futures
 
 print("[INFOR]: FRUITS FEATURE EXTRACTION.")
 
@@ -440,15 +441,3 @@ else:
 
 # close excel file
 WorkBook.close()
-
-
-# img = cv2.imread("../dataset/mango/Mango_01_A.JPG")
-# cv2.imshow("img", img)
-# test = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
-# M = img.shape[0] # Height of image
-# N = img.shape[1] # Width of image
-# # for x in range (0, M):
-# #         for y in range (0, N):
-# #             test[x, y] = img[x, y]
-# cv2.imshow("test", test)
-# cv2.waitKey(0)
