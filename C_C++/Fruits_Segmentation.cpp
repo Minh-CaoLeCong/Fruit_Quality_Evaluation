@@ -324,7 +324,7 @@ void Remove_Noise(string InputImagePath)
 	// create a black background image to draw contours on it
 	DrawFruitContour_Image = Mat::zeros(RemoveNoise_Image.size(), CV_8UC3);
 	// find contours
-	findContours(RemoveNoise_Image, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	findContours(RemoveNoise_Image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, Point(0, 0));
 	// take the number of contours
 	num_contours = (int)(contours.size());	// casting to int to remove warning:
 											// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
