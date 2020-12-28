@@ -24,12 +24,25 @@ extern string OutputFolder_ContourImage_Path;
 extern Mat Original_Image;
 extern Mat GrayScale_Image;
 extern Mat Blur_Image;
+extern Mat GaussianFilter_Image;
 extern Mat inRange_Image;
+extern Mat Threshold_Image;
 extern Mat Canny_Image;
 extern Mat Dilate_Image;
 extern Mat FloodFill_Image;
 extern Mat RemoveNoise_Image;
 extern Mat DrawFruitContour_Image;
+
+// OPENCV-CUDA
+extern cv::cuda::GpuMat GPU_Original_Image;
+extern cv::cuda::GpuMat GPU_GrayScale_Image;
+extern cv::cuda::GpuMat GPU_GaussianFilter_Image;
+extern cv::cuda::GpuMat GPU_Threshold_Image;
+extern cv::cuda::GpuMat GPU_Canny_Image;
+extern cv::cuda::GpuMat GPU_Dilate_Image;
+extern cv::cuda::GpuMat GPU_FloodFill_Image;
+extern cv::cuda::GpuMat GPU_RemoveNoise_Image;
+extern cv::cuda::GpuMat GPU_DrawFruitContour_Image;
 
 extern vector<string> vFileNames;
 extern int FileNames_index;

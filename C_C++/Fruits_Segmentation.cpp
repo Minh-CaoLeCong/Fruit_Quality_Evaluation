@@ -29,12 +29,25 @@ int check_mkdir;
 Mat Original_Image;
 Mat GrayScale_Image;
 Mat Blur_Image;
+Mat GaussianFilter_Image;
 Mat inRange_Image;
+Mat Threshold_Image;
 Mat Canny_Image;
 Mat Dilate_Image;
 Mat FloodFill_Image;
 Mat RemoveNoise_Image;
 Mat DrawFruitContour_Image;
+
+// OPENCV-CUDA
+cv::cuda::GpuMat GPU_Original_Image;
+cv::cuda::GpuMat GPU_GrayScale_Image;
+cv::cuda::GpuMat GPU_GaussianFilter_Image;
+cv::cuda::GpuMat GPU_Threshold_Image;
+cv::cuda::GpuMat GPU_Canny_Image;
+cv::cuda::GpuMat GPU_Dilate_Image;
+cv::cuda::GpuMat GPU_FloodFill_Image;
+cv::cuda::GpuMat GPU_RemoveNoise_Image;
+cv::cuda::GpuMat GPU_DrawFruitContour_Image;
 
 int area[MaxIntensity];
 int max_area;
@@ -234,119 +247,249 @@ vector<string> GetFileNamesInDirectory(string directory)
 
 void Remove_Noise(string InputImagePath)
 {
-	// load image
-	Original_Image = imread(InputImagePath);
-	/*namedWindow("Original_Image", CV_WINDOW_AUTOSIZE);
-	imshow("Original_Image", Original_Image);*/
+	if (Cuda_Checked)
+	{
+		// load image
+		Original_Image = imread(InputImagePath);
+		/*namedWindow("Original_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Original_Image", Original_Image);*/
 
-	// convert to grayscale
-	cvtColor(Original_Image, GrayScale_Image, COLOR_RGB2GRAY);
-	/*namedWindow("GrayScale_Image", CV_WINDOW_AUTOSIZE);
-	imshow("GrayScale_Image", GrayScale_Image);*/
-	imwrite(OutputFolder_GrayImage_Path + vFileNames[FileNames_index], GrayScale_Image);
+		// upload image to GPU
+		GPU_Original_Image.upload(Original_Image);
 
-	M = GrayScale_Image.size().height;	// height of image
-	N = GrayScale_Image.size().width;	// width of image
+		// convert to grayscale
+		cv::cuda::cvtColor(GPU_Original_Image, GPU_GrayScale_Image, COLOR_RGB2GRAY);
+		GPU_GrayScale_Image.download(GrayScale_Image);
+		/*namedWindow("GrayScale_Image", CV_WINDOW_AUTOSIZE);
+		imshow("GrayScale_Image", GrayScale_Image);*/
+		imwrite(OutputFolder_GrayImage_Path + vFileNames[FileNames_index], GrayScale_Image);
 
-	// filter image and reduce noise of background
-	blur(GrayScale_Image, Blur_Image, Size(5, 5));
-	/*namedWindow("Blur_Image", CV_WINDOW_AUTOSIZE);
-	imshow("Blur_Image", Blur_Image);*/
-	imwrite(OutputFolder_BlurImage_Path + vFileNames[FileNames_index], Blur_Image);
+		M = GPU_GrayScale_Image.size().height;	// height of image
+		N = GPU_GrayScale_Image.size().width;	// width of image
 
-	// inRange
-	inRange(Blur_Image, 30, 250, inRange_Image);
-	/*namedWindow("inRange_Image", CV_WINDOW_AUTOSIZE);
-	imshow("inRange_Image", inRange_Image);*/
-	imwrite(OutputFolder_InrangeImage_Path + vFileNames[FileNames_index], inRange_Image);
+		// filter image and reduce noise of background
+		cv::Ptr<cv::cuda::Filter> GaussianFilter = cv::cuda::createGaussianFilter(CV_8UC1, CV_8UC1, Size(5, 5), 1);
+		GaussianFilter->apply(GPU_GrayScale_Image, GPU_GaussianFilter_Image);
+		GPU_GaussianFilter_Image.download(GaussianFilter_Image);
+		/*namedWindow("GaussianFilter_Image", CV_WINDOW_AUTOSIZE);
+		imshow("GaussianFilter_Image", GaussianFilter_Image);*/
+		imwrite(OutputFolder_BlurImage_Path + vFileNames[FileNames_index], GaussianFilter_Image);
 
-	// using canny algorithm to find out the edge
-	Canny(inRange_Image, Canny_Image, 0, 3 * 0);
-	/*namedWindow("Canny_Image", CV_WINDOW_AUTOSIZE);
-	imshow("Canny_Image", Canny_Image);*/
-	imwrite(OutputFolder_CannyImage_Path + vFileNames[FileNames_index], Canny_Image);
+		// threshold
+		cv::cuda::threshold(GPU_GaussianFilter_Image, GPU_Threshold_Image, 30, 255, THRESH_BINARY);
+		GPU_Threshold_Image.download(Threshold_Image);
+		/*namedWindow("Threshold_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Threshold_Image", Threshold_Image);*/
+		imwrite(OutputFolder_InrangeImage_Path + vFileNames[FileNames_index], Threshold_Image);
 
-	// using dilate operation to try to find connected edge components
-	Mat w = getStructuringElement(MORPH_RECT, Size(3, 3));
-	dilate(Canny_Image, Dilate_Image, w);
-	//namedWindow("Dilate_Image", CV_WINDOW_AUTOSIZE);
-	//imshow("Dilate_Image", Dilate_Image);
-	imwrite(OutputFolder_DilateImage_Path + vFileNames[FileNames_index], Dilate_Image);
+		// using canny algorithm to find out the edge
+		cv::Ptr<cv::cuda::CannyEdgeDetector> canny = cv::cuda::createCannyEdgeDetector(0, 3 * 0);
+		canny->detect(GPU_Threshold_Image, GPU_Canny_Image);
+		GPU_Canny_Image.download(Canny_Image);
+		/*namedWindow("Canny_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Canny_Image", Canny_Image);*/
+		imwrite(OutputFolder_CannyImage_Path + vFileNames[FileNames_index], Canny_Image);
 
-	int gray = 10;
-	int x, y;
-	int r;
-	FloodFill_Image = Dilate_Image.clone();
-	// throughout each pixel value of the image
-	for (x = 0; x < M; x++)
-		for (y = 0; y < N; y++)
-		{
-			// take the current pixel value
-			r = FloodFill_Image.at<uchar>(x, y);
-			// check white pixel value
-			if (r == MaxIntensity - 1)
+		// using dilate operation to try to find connected edge components
+		Mat w = getStructuringElement(MORPH_RECT, Size(3, 3));
+		Ptr<cuda::Filter> DilateFilter = cuda::createMorphologyFilter(MORPH_DILATE, GPU_Canny_Image.type(), w);
+		DilateFilter->apply(GPU_Canny_Image, GPU_Dilate_Image);
+		GPU_Dilate_Image.download(Dilate_Image);
+		//namedWindow("Dilate_Image", CV_WINDOW_AUTOSIZE);
+		//imshow("Dilate_Image", Dilate_Image);
+		imwrite(OutputFolder_DilateImage_Path + vFileNames[FileNames_index], Dilate_Image);
+
+		int gray = 10;
+		int x, y;
+		int r;
+		FloodFill_Image = Dilate_Image.clone();
+		// throughout each pixel value of the image
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
 			{
-				// using 'floodFill' to mark or isolate portions of image
-				floodFill(FloodFill_Image, Point(y, x), CV_RGB(gray, gray, gray));
-				gray++;
+				// take the current pixel value
+				r = FloodFill_Image.at<uchar>(x, y);
+				// check white pixel value
+				if (r == MaxIntensity - 1)
+				{
+					// using 'floodFill' to mark or isolate portions of image
+					floodFill(FloodFill_Image, Point(y, x), CV_RGB(gray, gray, gray));
+					gray++;
+				}
+			}
+		/*namedWindow("FloodFill_Image", CV_WINDOW_AUTOSIZE);
+		imshow("FloodFill_Image", FloodFill_Image);*/
+		imwrite(OutputFolder_FloodFillImage_Path + vFileNames[FileNames_index], FloodFill_Image);
+
+		// determine area (the number of pixels) of each portions of image
+		for (r = 0; r < MaxIntensity; r++)
+			area[r] = 0;
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
+			{
+				r = FloodFill_Image.at<uchar>(x, y);
+				if (r > 0) // the pixel value of each portions of image is now equal or above 'GRAY_FLOODFILL'
+					area[r]++;
+			}
+		max_area, rmax_area = maxElementIndex(area, MaxIntensity);
+		// remove noise
+		RemoveNoise_Image = Mat(FloodFill_Image.size(), CV_8UC1);
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
+			{
+				r = FloodFill_Image.at<uchar>(x, y);
+				if (r == rmax_area)
+					RemoveNoise_Image.at<uchar>(x, y) = MaxIntensity - 1;
+				else
+					RemoveNoise_Image.at<uchar>(x, y) = 0;
+			}
+		/*namedWindow("RemoveNoise_Image", CV_WINDOW_AUTOSIZE);
+		imshow("RemoveNoise_Image", RemoveNoise_Image);*/
+		imwrite(OutputFolder_RemoveNoiseImage_Path + vFileNames[FileNames_index], RemoveNoise_Image);
+
+		// create a black background image to draw contours on it
+		DrawFruitContour_Image = Mat::zeros(RemoveNoise_Image.size(), CV_8UC3);
+		// find contours
+		findContours(RemoveNoise_Image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, Point(0, 0));
+		// take the number of contours
+		num_contours = (int)(contours.size());	// casting to int to remove warning:
+												// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+		// find the largest contour
+		largest_contour_value = int(contours[0].size());	// casting to int to remove warning:
+															// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+		largest_contour_index = 0;
+		for (int i = 1; i < num_contours; i++)
+		{
+			if (contours[i].size() > largest_contour_value)
+			{
+				largest_contour_value = int(contours[i].size());	// casting to int to remove warning:
+																	// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+
+				largest_contour_index = i;
 			}
 		}
-	/*namedWindow("FloodFill_Image", CV_WINDOW_AUTOSIZE);
-	imshow("FloodFill_Image", FloodFill_Image);*/
-	imwrite(OutputFolder_FloodFillImage_Path + vFileNames[FileNames_index], FloodFill_Image);
-
-	// determine area (the number of pixels) of each portions of image
-	for (r = 0; r < MaxIntensity; r++)
-		area[r] = 0;
-	for (x = 0; x < M; x++)
-		for (y = 0; y < N; y++)
-		{
-			r = FloodFill_Image.at<uchar>(x, y);
-			if (r > 0) // the pixel value of each portions of image is now equal or above 'GRAY_FLOODFILL'
-				area[r]++;
-		}
-	max_area, rmax_area = maxElementIndex(area, MaxIntensity);
-	// remove noise
-	RemoveNoise_Image = Mat(FloodFill_Image.size(), CV_8UC1);
-	for (x = 0; x < M; x++)
-		for (y = 0; y < N; y++)
-		{
-			r = FloodFill_Image.at<uchar>(x, y);
-			if (r == rmax_area)
-				RemoveNoise_Image.at<uchar>(x, y) = MaxIntensity - 1;
-			else
-				RemoveNoise_Image.at<uchar>(x, y) = 0;
-		}
-	/*namedWindow("RemoveNoise_Image", CV_WINDOW_AUTOSIZE);
-	imshow("RemoveNoise_Image", RemoveNoise_Image);*/
-	imwrite(OutputFolder_RemoveNoiseImage_Path + vFileNames[FileNames_index], RemoveNoise_Image);
-
-	// create a black background image to draw contours on it
-	DrawFruitContour_Image = Mat::zeros(RemoveNoise_Image.size(), CV_8UC3);
-	// find contours
-	findContours(RemoveNoise_Image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, Point(0, 0));
-	// take the number of contours
-	num_contours = (int)(contours.size());	// casting to int to remove warning:
-											// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
-	// find the largest contour
-	largest_contour_value = int(contours[0].size());	// casting to int to remove warning:
-														// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
-	largest_contour_index = 0;
-	for (int i = 1; i < num_contours; i++)
-	{
-		if (contours[i].size() > largest_contour_value)
-		{
-			largest_contour_value = int(contours[i].size());	// casting to int to remove warning:
-																// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
-
-			largest_contour_index = i;
-		}
+		// draw the largest contour
+		drawContours(DrawFruitContour_Image, contours, largest_contour_index, Scalar(0, 255, 0), 1, 8, hierarchy, 0, Point());
+		/*namedWindow("DrawFruitContour_Image", CV_WINDOW_AUTOSIZE);
+		imshow("DrawFruitContour_Image", DrawFruitContour_Image);*/
+		imwrite(OutputFolder_ContourImage_Path + vFileNames[FileNames_index], DrawFruitContour_Image);
 	}
-	// draw the largest contour
-	drawContours(DrawFruitContour_Image, contours, largest_contour_index, Scalar(0, 255, 0), 1, 8, hierarchy, 0, Point());
-	/*namedWindow("DrawFruitContour_Image", CV_WINDOW_AUTOSIZE);
-	imshow("DrawFruitContour_Image", DrawFruitContour_Image);*/
-	imwrite(OutputFolder_ContourImage_Path + vFileNames[FileNames_index], DrawFruitContour_Image);
+	else
+	{
+		// load image
+		Original_Image = imread(InputImagePath);
+		/*namedWindow("Original_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Original_Image", Original_Image);*/
+
+		// convert to grayscale
+		cvtColor(Original_Image, GrayScale_Image, COLOR_RGB2GRAY);
+		/*namedWindow("GrayScale_Image", CV_WINDOW_AUTOSIZE);
+		imshow("GrayScale_Image", GrayScale_Image);*/
+		imwrite(OutputFolder_GrayImage_Path + vFileNames[FileNames_index], GrayScale_Image);
+
+		M = GrayScale_Image.size().height;	// height of image
+		N = GrayScale_Image.size().width;	// width of image
+		
+		// filter image and reduce noise of background
+		blur(GrayScale_Image, Blur_Image, Size(5, 5));
+		/*namedWindow("Blur_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Blur_Image", Blur_Image);*/
+		imwrite(OutputFolder_BlurImage_Path + vFileNames[FileNames_index], Blur_Image);
+
+		// inRange
+		inRange(Blur_Image, 30, 250, inRange_Image);
+		/*namedWindow("inRange_Image", CV_WINDOW_AUTOSIZE);
+		imshow("inRange_Image", inRange_Image);*/
+		imwrite(OutputFolder_InrangeImage_Path + vFileNames[FileNames_index], inRange_Image);
+
+		// using canny algorithm to find out the edge
+		Canny(inRange_Image, Canny_Image, 0, 3 * 0);
+		/*namedWindow("Canny_Image", CV_WINDOW_AUTOSIZE);
+		imshow("Canny_Image", Canny_Image);*/
+		imwrite(OutputFolder_CannyImage_Path + vFileNames[FileNames_index], Canny_Image);
+
+		// using dilate operation to try to find connected edge components
+		Mat w = getStructuringElement(MORPH_RECT, Size(3, 3));
+		dilate(Canny_Image, Dilate_Image, w);
+		//namedWindow("Dilate_Image", CV_WINDOW_AUTOSIZE);
+		//imshow("Dilate_Image", Dilate_Image);
+		imwrite(OutputFolder_DilateImage_Path + vFileNames[FileNames_index], Dilate_Image);
+
+		int gray = 10;
+		int x, y;
+		int r;
+		FloodFill_Image = Dilate_Image.clone();
+		// throughout each pixel value of the image
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
+			{
+				// take the current pixel value
+				r = FloodFill_Image.at<uchar>(x, y);
+				// check white pixel value
+				if (r == MaxIntensity - 1)
+				{
+					// using 'floodFill' to mark or isolate portions of image
+					floodFill(FloodFill_Image, Point(y, x), CV_RGB(gray, gray, gray));
+					gray++;
+				}
+			}
+		/*namedWindow("FloodFill_Image", CV_WINDOW_AUTOSIZE);
+		imshow("FloodFill_Image", FloodFill_Image);*/
+		imwrite(OutputFolder_FloodFillImage_Path + vFileNames[FileNames_index], FloodFill_Image);
+
+		// determine area (the number of pixels) of each portions of image
+		for (r = 0; r < MaxIntensity; r++)
+			area[r] = 0;
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
+			{
+				r = FloodFill_Image.at<uchar>(x, y);
+				if (r > 0) // the pixel value of each portions of image is now equal or above 'GRAY_FLOODFILL'
+					area[r]++;
+			}
+		max_area, rmax_area = maxElementIndex(area, MaxIntensity);
+		// remove noise
+		RemoveNoise_Image = Mat(FloodFill_Image.size(), CV_8UC1);
+		for (x = 0; x < M; x++)
+			for (y = 0; y < N; y++)
+			{
+				r = FloodFill_Image.at<uchar>(x, y);
+				if (r == rmax_area)
+					RemoveNoise_Image.at<uchar>(x, y) = MaxIntensity - 1;
+				else
+					RemoveNoise_Image.at<uchar>(x, y) = 0;
+			}
+		/*namedWindow("RemoveNoise_Image", CV_WINDOW_AUTOSIZE);
+		imshow("RemoveNoise_Image", RemoveNoise_Image);*/
+		imwrite(OutputFolder_RemoveNoiseImage_Path + vFileNames[FileNames_index], RemoveNoise_Image);
+
+		// create a black background image to draw contours on it
+		DrawFruitContour_Image = Mat::zeros(RemoveNoise_Image.size(), CV_8UC3);
+		// find contours
+		findContours(RemoveNoise_Image, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, Point(0, 0));
+		// take the number of contours
+		num_contours = (int)(contours.size());	// casting to int to remove warning:
+												// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+		// find the largest contour
+		largest_contour_value = int(contours[0].size());	// casting to int to remove warning:
+															// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+		largest_contour_index = 0;
+		for (int i = 1; i < num_contours; i++)
+		{
+			if (contours[i].size() > largest_contour_value)
+			{
+				largest_contour_value = int(contours[i].size());	// casting to int to remove warning:
+																	// warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data.
+
+				largest_contour_index = i;
+			}
+		}
+		// draw the largest contour
+		drawContours(DrawFruitContour_Image, contours, largest_contour_index, Scalar(0, 255, 0), 1, 8, hierarchy, 0, Point());
+		/*namedWindow("DrawFruitContour_Image", CV_WINDOW_AUTOSIZE);
+		imshow("DrawFruitContour_Image", DrawFruitContour_Image);*/
+		imwrite(OutputFolder_ContourImage_Path + vFileNames[FileNames_index], DrawFruitContour_Image);
+	}
 
 	return;
 }
