@@ -30,8 +30,12 @@ X = data(:, 1); y = data(:, 2);
 m = length(y); % number of training examples
 
 % Scale training examples
-X = X / 100000;
-y = y / 100;
+% X = X / 100000;
+% y = y / 100;
+
+% Mean normalization
+X = meanNormalization(X);
+y = meanNormalization(y);
 
 % Plot Data
 % Note: You have to complete the code in plotData.m
