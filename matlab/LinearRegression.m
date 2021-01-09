@@ -34,8 +34,8 @@ m = length(y); % number of training examples
 % y = y / 100;
 
 % Mean normalization
-X = meanNormalization(X);
-y = meanNormalization(y);
+[X mu sigma] = featureNormalize(X);
+[y mu sigma] = featureNormalize(y);
 
 % Plot Data
 % Note: You have to complete the code in plotData.m
@@ -59,8 +59,8 @@ J = computeCost(X, y, theta);
 fprintf('With theta = [0 ; 0]\nCost computed = %f\n', J);
 
 % further testing of the cost function
-J = computeCost(X, y, [-2.32323 ; 2.33333]);
-fprintf('\nWith theta = [-2.32323 ; 2.33333]\nCost computed = %f\n', J);
+J = computeCost(X, y, [0.000000 ; 0.937416]);
+fprintf('\nWith theta = [0.000000 ; 0.937416]\nCost computed = %f\n', J);
 
 fprintf('Program paused. Press enter to continue.\n');
 pause;
