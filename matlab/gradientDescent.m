@@ -9,10 +9,7 @@ J_history = zeros(num_iters, 1);
 
 for iter = 1:num_iters
 
-    err = (X * theta) - y; 
-    theta0 = theta(1) - ( alpha /m ) * sum(err.* X(:,1));
-    theta1 = theta(2) - ( alpha /m ) * sum(err.* X(:,2));
-    theta = [theta0; theta1];
+    theta = theta - (1 / m) * alpha * (X') * (X * theta - y);
 
     % ============================================================
 
