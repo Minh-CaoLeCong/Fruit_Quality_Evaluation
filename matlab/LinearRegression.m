@@ -169,3 +169,25 @@ plot(theta6(1), theta6(2), 'yx', 'MarkerSize', 10, 'LineWidth', 2);
 plot(theta7(1), theta7(2), 'kx', 'MarkerSize', 10, 'LineWidth', 2);
 
 legend('J','0.2', '0.001', '0.003', '0.01', '0.03', '0.1', '0.3', '1')
+
+%% ================ Normal Equations ================
+data = load('Weight_AreaPixels_B_Immaturity_25_50.txt');
+X = data(:, 1); 
+y = data(:, 2);
+m = length(y); % number of training examples
+
+X = [ones(m, 1) X]; % Add intercept term to X
+
+% Calculate the parameters from the normal equation
+theta = normalEqn(X, y);
+
+% Display normal equation's result
+fprintf('\n');
+fprintf('Theta computed from the normal equations: \n');
+fprintf(' %f \n', theta);
+
+% further testing of the cost function
+J = computeCost(X, y, theta);
+fprintf('With theta = %.6f\n', theta);
+fprintf('Cost computed = %.6f\n', J);
+fprintf('\n');
